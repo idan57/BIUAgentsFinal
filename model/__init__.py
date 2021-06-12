@@ -2,43 +2,47 @@ import os
 from collections import Counter
 
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingRegressor, BaggingClassifier
+from sklearn.ensemble import RandomForestClassifier, BaggingClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBClassifier
 
-COLS_TO_ENCODE = [
-    "Attrition",
-    "BusinessTravel",
-    "Department",
-    "EducationField",
-    "Gender",
-    "JobRole",
-    "MaritalStatus",
-    "Over18",
-    "OverTime"
-]
+COLS_TO_ENCODE = {
+    "Attrition": {},
+    "BusinessTravel": {},
+    "Department": {},
+    "EducationField": {},
+    "Gender": {},
+    "JobRole": {},
+    "MaritalStatus": {},
+    "Over18": {},
+    "OverTime": {}
+}
 
 
 class HREmployeeAttritionModel(object):
+    COLS_INDEXES = {}
+
     def __init__(self):
         self._number_of_employees = 0
-        self._hr_retention_data = self._get_hr_retention_data()
+        self.hr_retention_data = self._get_hr_retention_data()
+        self.x_cols = [col for col in self.hr_retention_data.columns if col != "Attrition"]
+        self.reversed_mappings = {}
+        HREmployeeAttritionModel.COLS_INDEXES = {col: 0
+                                                 for col in self.hr_retention_data.columns
+                                                 if col != "Attrition"}
 
         self.classifiers = {
             "RandomForestClassifier_Gini": RandomForestClassifier(n_estimators=500, criterion="gini"),
             "RandomForestClassifier_Entropy": RandomForestClassifier(n_estimators=500, criterion="entropy"),
             "KNeighborsClassifier": KNeighborsClassifier(),
-            "GradientBoostingRegressor": GradientBoostingRegressor(n_estimators=100, loss='ls'),
             "BaggingClassifier": BaggingClassifier(n_estimators=1000),
             "XGBClassifier": XGBClassifier(n_estimators=1000, max_depth=3)
         }
 
         fitted_data = self._get_fitted_data()
-        x_cols = [col for col in self._hr_retention_data.columns if col != "Attrition"]
-        x = fitted_data[x_cols]
+        x = fitted_data[self.x_cols]
         y = fitted_data["Attrition"]
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x, y, test_size=0.2, random_state=999)
 
@@ -49,11 +53,25 @@ class HREmployeeAttritionModel(object):
         return data
 
     def _get_fitted_data(self):
-        encoder = LabelEncoder()
-        data = self._hr_retention_data.copy(deep=True)
+        data = self.hr_retention_data.copy(deep=True)
+
+        for col in self.hr_retention_data.columns:
+            col_data = data[col].astype(str)
+            col_data = set(col_data.tolist())
+            reverse_mapping = {i: val for val, i in zip(col_data, range(len(col_data)))}
+            self.reversed_mappings[col] = reverse_mapping
+
+        for col in self.hr_retention_data.columns:
+            if col in HREmployeeAttritionModel.COLS_INDEXES:
+                HREmployeeAttritionModel.COLS_INDEXES[col] = list(self.hr_retention_data.columns).index(col)
 
         for col in COLS_TO_ENCODE:
-            data[col] = encoder.fit_transform(data[col].astype(str))
+            col_data = data[col].astype(str)
+            col_data = set(col_data.tolist())
+            print(f"{col}: {col_data}")
+            mapping = {val: i for val, i in zip(col_data, range(len(col_data)))}
+            COLS_TO_ENCODE[col] = mapping
+            data[col] = data[col].map(mapping)
 
         return data
 
@@ -66,15 +84,21 @@ class HREmployeeAttritionModel(object):
 
     def predict(self, data):
         predictions = []
+        end_predictions = []
         for model_name, model in self.classifiers.items():
             print(f"Predicting with model: {model_name}")
             prediction = model.predict(data)
             predictions.append(prediction)
             print(f"Predicted: {prediction}")
 
-        counted_predictions = Counter(predictions)
-        top_prediction = max(counted_predictions, key=counted_predictions.get)
-        return top_prediction
+        num_of_classifiers = len(self.classifiers)
+
+        for i in range(len(predictions[0])):
+            preds = [predictions[j][i] for j in range(num_of_classifiers)]
+            counted_predictions = Counter(preds)
+            top_prediction = max(counted_predictions, key=counted_predictions.get)
+            end_predictions.append(top_prediction)
+        return end_predictions
 
     def log_train_res(self, model, model_name):
         print(f"Train accuracy for {model_name}: "

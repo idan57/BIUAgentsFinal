@@ -16,12 +16,22 @@ def get_age_index_to_inc(age):
 
 
 def get_monthly_index_to_inc(monthly_income):
-    if monthly_income < 10000:
+    if 1000 <= monthly_income < 2500:
         return 0
-    elif 10000 <= monthly_income < 15000:
+    if 2500 <= monthly_income < 5000:
         return 1
-    else:
+    elif 5000 <= monthly_income < 7500:
         return 2
+    elif 7500 <= monthly_income < 10000:
+        return 3
+    elif 10000 <= monthly_income < 12500:
+        return 4
+    elif 12500 <= monthly_income < 15000:
+        return 5
+    elif 15000 <= monthly_income < 17500:
+        return 6
+    else:
+        return 7
 
 
 def get_hourly_rate_index_to_inc(hourly_rate):
@@ -74,11 +84,13 @@ def visualize_classifier():
             "vals": [0] * 7
         },
         "MonthlyIncome": {
-            "langs": ["Below 10000", "Between 10000 and 15000", "Above 15000"],
-            "vals": [0] * 3
+            "langs": ["1000 - 2500", "2500 - 5000", "5000 - 7500", "7500 - 10000", "10000 - 12500", "12500 - 15000",
+                      "15000 - 17500", "17500 - 20000"],
+            "vals": [0] * 8
         },
     }
-    not_needed_to_add = ["EmployeeNumber", "Age", "DailyRate", "EmployeeCount", "MonthlyRate", "Over18"]
+    not_needed_to_add = ["EmployeeNumber", "Age", "DailyRate", "EmployeeCount", "MonthlyRate", "Over18",
+                         "MonthlyIncome"]
 
     for col in model.hr_retention_data.columns:
         if col not in not_needed_to_add:
