@@ -1,4 +1,5 @@
 import os
+from copy import deepcopy
 
 from model import HREmployeeAttritionModel
 import matplotlib.pyplot as plt
@@ -51,9 +52,9 @@ def get_hourly_rate_index_to_inc(hourly_rate):
         return 6
 
 
-def save_figures(cols_for_plotting):
-    if not os.path.isdir("Plots"):
-        os.mkdir("Plots")
+def save_figures(cols_for_plotting, directory):
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
 
     for key, val in cols_for_plotting.items():
         print(f"Saving figure: {key}")
@@ -66,11 +67,11 @@ def save_figures(cols_for_plotting):
         plt.ylabel(f"{key} Values")
         plt.title(key)
 
-        fig.savefig(os.path.join("Plots", f"{key}.png"), dpi=fig.dpi)
+        fig.savefig(os.path.join(directory, f"{key}.png"), dpi=fig.dpi)
         plt.close()
 
 
-def visualize_classifier():
+def visualize_classifier(model, directory):
     predictions = model.predict(model.x_test)
     mistakes = []
     cols_for_plotting = {
@@ -142,15 +143,52 @@ def visualize_classifier():
         val = cols_for_plotting["Attrition"]
         val["vals"][attrition] += 1
 
-    save_figures(cols_for_plotting)
+    save_figures(cols_for_plotting, directory)
+    return predictions
 
 
 if __name__ == '__main__':
-    model = HREmployeeAttritionModel()
+    model_with_monthly_income = HREmployeeAttritionModel()
+    model_without_monthly_income = deepcopy(model_with_monthly_income)
+    del model_without_monthly_income.hr_retention_data["MonthlyIncome"]
 
     # Train model
-    model.train()
+    print("Training model with monthly income...")
+    model_with_monthly_income.train()
+    print("Done!")
+
+    print("Training model without monthly income...")
+    model_without_monthly_income.train()
+    print("Done!")
 
     # Predict On Test
     results = []
-    visualize_classifier()
+    with_income_directory = os.path.join("Plots", "With Monthly Income")
+    without_income_directory = os.path.join("Plots", "Without Monthly Income")
+
+    # Visualize and save figures
+    print("Visualizing model with monthly income...")
+    predictions_with_monthly_income = visualize_classifier(model_with_monthly_income, with_income_directory)
+    print("Done!")
+
+    print("Visualizing model without monthly income...")
+    predictions_without_monthly_income = visualize_classifier(model_without_monthly_income, without_income_directory)
+    print("Done!")
+
+    # Intersection
+    employee_number_index = model_with_monthly_income.COLS_INDEXES["EmployeeNumber"]
+    predictions_with_monthly_income = {str(emp[employee_number_index])
+                                       for emp, attrition in zip(model_with_monthly_income.x_test.values,
+                                                                 predictions_with_monthly_income)}
+    predictions_without_monthly_income = {str(emp[employee_number_index])
+                                          for emp, attrition in zip(model_with_monthly_income.x_test.values,
+                                                                    predictions_without_monthly_income)}
+
+    with_income_intersection = predictions_with_monthly_income.intersection(predictions_without_monthly_income)
+    without_income_intersection = predictions_without_monthly_income.intersection(predictions_with_monthly_income)
+
+    with open("with_income_intersection.txt", "w") as with_income_file:
+        with_income_file.write("\n".join(with_income_intersection))
+
+    with open("without_income_intersection.txt", "w") as without_income_file:
+        without_income_file.write("\n".join(without_income_intersection))
