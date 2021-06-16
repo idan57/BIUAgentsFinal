@@ -1,11 +1,28 @@
 import os
-from copy import deepcopy
+import numpy as np
+
 
 from model import HREmployeeAttritionModel
 import matplotlib.pyplot as plt
 
 plt.ioff()
 
+cols_for_plotting = {
+    "Age": {
+        "langs": ["Age <= 30", "30 < Age < 40", "Age >= 40"],
+        "vals": [0] * 3
+    },
+    "HourlyRate": {
+        "langs": [f"{30 + i * 10} <= Hourly Rate < {30 + (i + 1) * 10}" for i in range(6)] +
+                 ["90 <= Hourly Rate <= 100"],
+        "vals": [0] * 7
+    },
+    "MonthlyIncome": {
+        "langs": ["1000 - 2500", "2500 - 5000", "5000 - 7500", "7500 - 10000", "10000 - 12500", "12500 - 15000",
+                  "15000 - 17500", "17500 - 20000"],
+        "vals": [0] * 8
+    },
+}
 
 def get_age_index_to_inc(age):
     if age <= 30:
@@ -74,22 +91,6 @@ def save_figures(cols_for_plotting, directory):
 def visualize_classifier(model, directory):
     predictions = model.predict(model.x_test)
     mistakes = []
-    cols_for_plotting = {
-        "Age": {
-            "langs": ["Age <= 30", "30 < Age < 40", "Age >= 40"],
-            "vals": [0] * 3
-        },
-        "HourlyRate": {
-            "langs": [f"{30 + i * 10} <= Hourly Rate < {30 + (i + 1) * 10}" for i in range(6)] +
-                     ["90 <= Hourly Rate <= 100"],
-            "vals": [0] * 7
-        },
-        "MonthlyIncome": {
-            "langs": ["1000 - 2500", "2500 - 5000", "5000 - 7500", "7500 - 10000", "10000 - 12500", "12500 - 15000",
-                      "15000 - 17500", "17500 - 20000"],
-            "vals": [0] * 8
-        },
-    }
     not_needed_to_add = ["EmployeeNumber", "Age", "DailyRate", "EmployeeCount", "MonthlyRate", "Over18",
                          "MonthlyIncome"]
 
@@ -110,20 +111,23 @@ def visualize_classifier(model, directory):
         if attrition != y:
             mistakes.append(x)
         if attrition:
-            monthly_income_index = model.COLS_INDEXES["MonthlyIncome"]
-            hourly_rate_index = model.COLS_INDEXES["HourlyRate"]
-            age = x[0]
-            hourly_rate = x[hourly_rate_index]
-            monthly_income = x[monthly_income_index]
 
-            age_index_to_inc = get_age_index_to_inc(age)
-            cols_for_plotting["Age"]["vals"][age_index_to_inc] += 1
+            if "Age" in model.COLS_INDEXES:
+                age = x[0]
+                age_index_to_inc = get_age_index_to_inc(age)
+                cols_for_plotting["Age"]["vals"][age_index_to_inc] += 1
 
-            monthly_index_to_inc = get_monthly_index_to_inc(monthly_income)
-            cols_for_plotting["MonthlyIncome"]["vals"][monthly_index_to_inc] += 1
+            if "MonthlyIncome" in model.COLS_INDEXES:
+                monthly_income_index = model.COLS_INDEXES["MonthlyIncome"]
+                monthly_income = x[monthly_income_index]
+                monthly_index_to_inc = get_monthly_index_to_inc(monthly_income)
+                cols_for_plotting["MonthlyIncome"]["vals"][monthly_index_to_inc] += 1
 
-            hourly_rate_index_to_inc = get_hourly_rate_index_to_inc(hourly_rate)
-            cols_for_plotting["HourlyRate"]["vals"][hourly_rate_index_to_inc] += 1
+            if "HourlyRate" in model.COLS_INDEXES:
+                hourly_rate_index = model.COLS_INDEXES["HourlyRate"]
+                hourly_rate = x[hourly_rate_index]
+                hourly_rate_index_to_inc = get_hourly_rate_index_to_inc(hourly_rate)
+                cols_for_plotting["HourlyRate"]["vals"][hourly_rate_index_to_inc] += 1
 
             for col, index in model.COLS_INDEXES.items():
                 if col in already_added or col not in cols_for_plotting:
@@ -131,7 +135,6 @@ def visualize_classifier(model, directory):
 
                 val = cols_for_plotting[col]
 
-                index -= 1
                 option = x[index]
                 if option in model.reversed_mappings[col]:
                     orig_op = model.reversed_mappings[col][option]
@@ -148,47 +151,63 @@ def visualize_classifier(model, directory):
 
 
 if __name__ == '__main__':
+    from datetime import datetime
+
     model_with_monthly_income = HREmployeeAttritionModel()
-    model_without_monthly_income = deepcopy(model_with_monthly_income)
-    del model_without_monthly_income.hr_retention_data["MonthlyIncome"]
+
+    vals = {}
+    del model_with_monthly_income.hr_retention_data["EmployeeNumber"]
+    del model_with_monthly_income.hr_retention_data["EmployeeCount"]
+    features = model_with_monthly_income.hr_retention_data.columns
+
+    for feature in features:
+        if feature == "Attrition":
+            continue
+
+        langs = list(set(model_with_monthly_income.hr_retention_data[feature].tolist()))
+        langs.sort()
+        is_bool = False
+
+        if type(langs[0]) == int or type(langs[0]) == float:
+            options = f"{min(langs)} - {max(langs)}"
+        elif type(langs[0]) == str:
+            options = ", ".join(langs)
+        else:
+            is_bool = True
+            options = "false / true"
+
+        val = input(f"Please enter your {feature} ({options}): ")
+        if is_bool:
+            val = bool(val)
+            if val:
+                val = 1
+            else:
+                val = 0
+        if val:
+            vals[feature] = val
+        else:
+            del model_with_monthly_income.hr_retention_data[feature]
 
     # Train model
     print("Training model with monthly income...")
     model_with_monthly_income.train()
     print("Done!")
 
-    print("Training model without monthly income...")
-    model_without_monthly_income.train()
-    print("Done!")
-
     # Predict On Test
     results = []
-    with_income_directory = os.path.join("Plots", "With Monthly Income")
-    without_income_directory = os.path.join("Plots", "Without Monthly Income")
+    now = datetime.now().strftime("%H_%M_%S_%f")
+    result_dir = os.path.join("Plots", now)
 
     # Visualize and save figures
     print("Visualizing model with monthly income...")
-    predictions_with_monthly_income = visualize_classifier(model_with_monthly_income, with_income_directory)
+    predictions_with_monthly_income = visualize_classifier(model_with_monthly_income, result_dir)
     print("Done!")
 
-    print("Visualizing model without monthly income...")
-    predictions_without_monthly_income = visualize_classifier(model_without_monthly_income, without_income_directory)
-    print("Done!")
-
-    # Intersection
-    employee_number_index = model_with_monthly_income.COLS_INDEXES["EmployeeNumber"]
-    predictions_with_monthly_income = {str(emp[employee_number_index])
-                                       for emp, attrition in zip(model_with_monthly_income.x_test.values,
-                                                                 predictions_with_monthly_income)}
-    predictions_without_monthly_income = {str(emp[employee_number_index])
-                                          for emp, attrition in zip(model_with_monthly_income.x_test.values,
-                                                                    predictions_without_monthly_income)}
-
-    with_income_intersection = predictions_with_monthly_income.intersection(predictions_without_monthly_income)
-    without_income_intersection = predictions_without_monthly_income.intersection(predictions_with_monthly_income)
-
-    with open("with_income_intersection.txt", "w") as with_income_file:
-        with_income_file.write("\n".join(with_income_intersection))
-
-    with open("without_income_intersection.txt", "w") as without_income_file:
-        without_income_file.write("\n".join(without_income_intersection))
+    print("Predicting your values!!!")
+    vals = model_with_monthly_income.fit_data(vals)
+    vals = np.asarray([vals])
+    result = model_with_monthly_income.predict(vals)[0]
+    if result:
+        print("It is best that you quite your job...")
+    else:
+        print("You shouldn't quite your job!")

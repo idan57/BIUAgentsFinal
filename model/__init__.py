@@ -27,11 +27,8 @@ class HREmployeeAttritionModel(object):
     def __init__(self):
         self._number_of_employees = 0
         self.hr_retention_data = self._get_hr_retention_data()
-        self.x_cols = [col for col in self.hr_retention_data.columns if col != "Attrition"]
+        self.x_cols = []
         self.reversed_mappings = {}
-        HREmployeeAttritionModel.COLS_INDEXES = {col: 0
-                                                 for col in self.hr_retention_data.columns
-                                                 if col != "Attrition"}
 
         self.classifiers = {
             "RandomForestClassifier_Gini": RandomForestClassifier(n_estimators=500, criterion="gini"),
@@ -40,11 +37,7 @@ class HREmployeeAttritionModel(object):
             "BaggingClassifier": BaggingClassifier(n_estimators=1000),
             "XGBClassifier": XGBClassifier(n_estimators=1000, max_depth=3)
         }
-
-        fitted_data = self._get_fitted_data()
-        x = fitted_data[self.x_cols]
-        y = fitted_data["Attrition"]
-        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x, y, test_size=0.2, random_state=999)
+        self.x_train, self.x_test, self.y_train, self.y_test = None, None, None, None
 
     def _get_hr_retention_data(self):
         path_to_data = os.path.join(os.path.dirname(__file__), "data", "HR-Employee-Attrition.csv")
@@ -61,21 +54,37 @@ class HREmployeeAttritionModel(object):
             reverse_mapping = {i: val for val, i in zip(col_data, range(len(col_data)))}
             self.reversed_mappings[col] = reverse_mapping
 
-        for col in self.hr_retention_data.columns:
-            if col in HREmployeeAttritionModel.COLS_INDEXES:
-                HREmployeeAttritionModel.COLS_INDEXES[col] = list(self.hr_retention_data.columns).index(col)
-
         for col in COLS_TO_ENCODE:
-            col_data = data[col].astype(str)
-            col_data = set(col_data.tolist())
-            print(f"{col}: {col_data}")
-            mapping = {val: i for val, i in zip(col_data, range(len(col_data)))}
-            COLS_TO_ENCODE[col] = mapping
-            data[col] = data[col].map(mapping)
+            if col in data.columns:
+                col_data = data[col].astype(str)
+                col_data = set(col_data.tolist())
+                print(f"{col}: {col_data}")
+                mapping = {val: i for val, i in zip(col_data, range(len(col_data)))}
+                COLS_TO_ENCODE[col] = mapping
+                data[col] = data[col].map(mapping)
 
         return data
 
     def train(self):
+        HREmployeeAttritionModel.COLS_INDEXES = {col: 0
+                                                 for col in self.hr_retention_data.columns
+                                                 if col != "Attrition"}
+        found_attrition = False
+        for col in self.hr_retention_data.columns:
+            if col == "Attrition":
+                found_attrition = True
+                continue
+
+            if col in HREmployeeAttritionModel.COLS_INDEXES and not found_attrition:
+                HREmployeeAttritionModel.COLS_INDEXES[col] = list(self.hr_retention_data.columns).index(col)
+            elif col in HREmployeeAttritionModel.COLS_INDEXES and found_attrition:
+                HREmployeeAttritionModel.COLS_INDEXES[col] = list(self.hr_retention_data.columns).index(col) - 1
+
+        self.x_cols = [col for col in self.hr_retention_data.columns if col != "Attrition"]
+        fitted_data = self._get_fitted_data()
+        x = fitted_data[self.x_cols]
+        y = fitted_data["Attrition"]
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x, y, test_size=0.2, random_state=999)
         for model_name, model in self.classifiers.items():
             print(f"Training model: {model_name}")
             model.fit(self.x_train, self.y_train)
@@ -106,3 +115,14 @@ class HREmployeeAttritionModel(object):
 
         print(f"Test accuracy for {model_name}: "
               f"{accuracy_score(self.y_test, model.predict(self.x_test))}")
+
+    @staticmethod
+    def fit_data(vals: dict):
+        result = []
+        for key, val in vals.items():
+            if key in COLS_TO_ENCODE:
+                result.append(COLS_TO_ENCODE[key][val])
+            else:
+                result.append(float(val))
+
+        return result
