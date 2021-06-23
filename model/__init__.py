@@ -22,6 +22,9 @@ COLS_TO_ENCODE = {
 
 
 class HREmployeeAttritionModel(object):
+    """
+    Class that will train over the HR data
+    """
     COLS_INDEXES = {}
 
     def __init__(self):
@@ -66,6 +69,9 @@ class HREmployeeAttritionModel(object):
         return data
 
     def train(self):
+        """
+        Train the model
+        """
         HREmployeeAttritionModel.COLS_INDEXES = {col: 0
                                                  for col in self.hr_retention_data.columns
                                                  if col != "Attrition"}
@@ -92,6 +98,9 @@ class HREmployeeAttritionModel(object):
             self.log_train_res(model, model_name)
 
     def predict(self, data):
+        """
+        Predict from given data
+        """
         predictions = []
         end_predictions = []
         for model_name, model in self.classifiers.items():
@@ -110,6 +119,9 @@ class HREmployeeAttritionModel(object):
         return end_predictions
 
     def log_train_res(self, model, model_name):
+        """
+        Log training data
+        """
         print(f"Train accuracy for {model_name}: "
               f"{accuracy_score(self.y_train, model.predict(self.x_train))}")
 
@@ -118,6 +130,9 @@ class HREmployeeAttritionModel(object):
 
     @staticmethod
     def fit_data(vals: dict):
+        """
+        Fit given data
+        """
         result = []
         for key, val in vals.items():
             if key in COLS_TO_ENCODE:
