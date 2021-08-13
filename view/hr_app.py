@@ -1,5 +1,6 @@
+import logging
 from datetime import datetime
-from time import sleep
+from typing import List
 
 import PySimpleGUI as sg
 
@@ -11,6 +12,7 @@ import numpy as np
 from model import HREmployeeAttritionModel
 import matplotlib.pyplot as plt
 
+from view.checkers import MinMaxChecker, OptionsChecker, Checker
 from view.timer import open_timer
 
 plt.ioff()
@@ -84,7 +86,7 @@ def save_figures(cols_for_plotting, directory):
         os.makedirs(directory)
 
     for key, val in cols_for_plotting.items():
-        print(f"Saving figure: {key}")
+        logging.info(f"Saving figure: {key}")
         fig = plt.figure(figsize=(20, 10))
 
         # creating the bar plot
@@ -160,6 +162,26 @@ def visualize_classifier(model, directory):
     return predictions
 
 
+def values_are_valid(values, checkers: List[Checker]):
+    not_valid_vals = []
+    for val, checker in zip(values, checkers):
+        if val:
+            logging.info(f"Checking '{checker.col}' value: {val}")
+            if not checker.check(val):
+                logging.warning(f"'{checker.col}' value '{val}' is not valid")
+                not_valid_vals.append([checker.col, val])
+
+    if not_valid_vals:
+        msg = "The following values are invalid please try again (the left is the name of the field you provided):\n"
+        lines = []
+        for col, val in not_valid_vals:
+            lines.append(f"{col} -> {val}")
+        msg += "\n".join(lines)
+        sg.popup(msg, title="Invalid Input!")
+        return False
+    return True
+
+
 def open_gui():
     vals = {}
     model_with_monthly_income = HREmployeeAttritionModel()
@@ -171,6 +193,7 @@ def open_gui():
 
     cols = []
     is_bool_dict = {}
+    checkers = []
     for feature, i in zip(features, range(len(features))):
         if feature == "Attrition":
             continue
@@ -180,9 +203,12 @@ def open_gui():
         is_bool = False
 
         if type(langs[0]) == int or type(langs[0]) == float:
-            options = f"{min(langs)} - {max(langs)}"
+            min_val, max_val = min(langs), max(langs)
+            checkers.append(MinMaxChecker(min_val, max_val, feature))
+            options = f"{min_val} - {max_val}"
         elif type(langs[0]) == str:
             options = ", ".join(langs)
+            checkers.append(OptionsChecker(langs, feature))
         else:
             is_bool = True
             options = "false / true"
@@ -216,6 +242,9 @@ def open_gui():
 
             # Do something with the information gathered
             if values:
+                if not values_are_valid(list(values.values())[1:], checkers):
+                    continue
+
                 timer_proc = open_timer()
                 closed_timer = False
                 try:
@@ -233,20 +262,20 @@ def open_gui():
                             del model_with_monthly_income.hr_retention_data[feature]
 
                     # Train model
-                    print("Training model with monthly income...")
+                    logging.info("Training model with monthly income...")
                     model_with_monthly_income.train()
-                    print("Done!")
+                    logging.info("Done!")
 
                     # Predict On Test
                     now = datetime.now().strftime("%H_%M_%S_%f")
                     result_dir = os.path.join("Plots", now)
 
                     # Visualize and save figures
-                    print("Visualizing model with monthly income...")
+                    logging.info("Visualizing model with monthly income...")
                     predictions_with_monthly_income = visualize_classifier(model_with_monthly_income, result_dir)
-                    print("Done!")
+                    logging.info("Done!")
 
-                    print("Predicting your values!!!")
+                    logging.info("Predicting your values!!!")
                     vals = model_with_monthly_income.fit_data(vals)
                     vals = np.asarray([vals])
                     result = model_with_monthly_income.predict(vals)[0]

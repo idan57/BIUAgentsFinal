@@ -1,3 +1,4 @@
+import logging
 import os
 from collections import Counter
 
@@ -61,7 +62,7 @@ class HREmployeeAttritionModel(object):
             if col in data.columns:
                 col_data = data[col].astype(str)
                 col_data = set(col_data.tolist())
-                print(f"{col}: {col_data}")
+                logging.info(f"{col}: {col_data}")
                 mapping = {val: i for val, i in zip(col_data, range(len(col_data)))}
                 COLS_TO_ENCODE[col] = mapping
                 data[col] = data[col].map(mapping)
@@ -92,9 +93,9 @@ class HREmployeeAttritionModel(object):
         y = fitted_data["Attrition"]
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x, y, test_size=0.2, random_state=999)
         for model_name, model in self.classifiers.items():
-            print(f"Training model: {model_name}")
+            logging.info(f"Training model: {model_name}")
             model.fit(self.x_train, self.y_train)
-            print(f"Training is done")
+            logging.info(f"Training is done")
             self.log_train_res(model, model_name)
 
     def predict(self, data):
@@ -104,10 +105,10 @@ class HREmployeeAttritionModel(object):
         predictions = []
         end_predictions = []
         for model_name, model in self.classifiers.items():
-            print(f"Predicting with model: {model_name}")
+            logging.info(f"Predicting with model: {model_name}")
             prediction = model.predict(data)
             predictions.append(prediction)
-            print(f"Predicted: {prediction}")
+            logging.info(f"Predicted: {prediction}")
 
         num_of_classifiers = len(self.classifiers)
 
@@ -122,10 +123,10 @@ class HREmployeeAttritionModel(object):
         """
         Log training data
         """
-        print(f"Train accuracy for {model_name}: "
+        logging.info(f"Train accuracy for {model_name}: "
               f"{accuracy_score(self.y_train, model.predict(self.x_train))}")
 
-        print(f"Test accuracy for {model_name}: "
+        logging.info(f"Test accuracy for {model_name}: "
               f"{accuracy_score(self.y_test, model.predict(self.x_test))}")
 
     @staticmethod
