@@ -304,12 +304,12 @@ def open_gui():
                         import psutil
                         p = psutil.Process(timer_proc.pid)
                         p.terminate()
-                        sg.popup(f"{values[0]} it is best that you quite your job...", title="HR Result")
+                        sg.popup(f"{values[0]} it is best that you quit your job...", title="HR Result")
                     else:
                         import psutil
                         p = psutil.Process(timer_proc.pid)
                         p.terminate()
-                        sg.popup(f"{values[0]} you shouldn't quite your job!", title="HR Result")
+                        sg.popup(f"{values[0]} you shouldn't quit your job!", title="HR Result")
                     closed_timer = True
                     model_with_monthly_income = HREmployeeAttritionModel()
                 finally:
