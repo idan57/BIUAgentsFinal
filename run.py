@@ -22,4 +22,6 @@ def set_logger():
 
 if __name__ == '__main__':
     set_logger()
+    logging.info("********************************** OPENING APP **********************************")
     open_gui()
+    logging.info("********************************** CLOSING APP **********************************")

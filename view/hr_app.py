@@ -37,6 +37,9 @@ cols_for_plotting = {
 
 
 def get_age_index_to_inc(age):
+    """
+    Get index for an age
+    """
     if age <= 30:
         return 0
     elif 30 < age < 40:
@@ -46,6 +49,9 @@ def get_age_index_to_inc(age):
 
 
 def get_monthly_index_to_inc(monthly_income):
+    """
+    Get index for a monthly income
+    """
     if 1000 <= monthly_income < 2500:
         return 0
     if 2500 <= monthly_income < 5000:
@@ -65,6 +71,9 @@ def get_monthly_index_to_inc(monthly_income):
 
 
 def get_hourly_rate_index_to_inc(hourly_rate):
+    """
+    Get index for hourly rate
+    """
     if 30 <= hourly_rate < 40:
         return 0
     if 40 <= hourly_rate < 50:
@@ -82,6 +91,9 @@ def get_hourly_rate_index_to_inc(hourly_rate):
 
 
 def save_figures(cols_for_plotting, directory):
+    """
+    Save cols values in files as graphs
+    """
     if not os.path.isdir(directory):
         os.makedirs(directory)
 
@@ -101,6 +113,9 @@ def save_figures(cols_for_plotting, directory):
 
 
 def visualize_classifier(model, directory):
+    """
+    Visualize a model
+    """
     predictions = model.predict(model.x_test)
     mistakes = []
     not_needed_to_add = ["EmployeeNumber", "Age", "DailyRate", "EmployeeCount", "MonthlyRate", "Over18",
@@ -163,6 +178,9 @@ def visualize_classifier(model, directory):
 
 
 def values_are_valid(values, checkers: List[Checker]):
+    """
+    Check if the given values are valid by their checkers
+    """
     not_valid_vals = []
     for val, checker in zip(values, checkers):
         if val:
@@ -183,6 +201,9 @@ def values_are_valid(values, checkers: List[Checker]):
 
 
 def open_gui():
+    """
+    Opens the GUI for the app
+    """
     vals = {}
     model_with_monthly_income = HREmployeeAttritionModel()
     del model_with_monthly_income.hr_retention_data["EmployeeNumber"]

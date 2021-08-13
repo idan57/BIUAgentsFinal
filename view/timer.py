@@ -58,6 +58,9 @@ def _start_timer():
 
 
 def open_timer() -> Process:
+    """
+    Opens timer screen
+    """
     p = Process(target=_start_timer)
     p.start()
     return p
