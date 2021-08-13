@@ -29,9 +29,8 @@ cols_for_plotting = {
         "vals": [0] * 7
     },
     "MonthlyIncome": {
-        "langs": ["1000 - 2500", "2500 - 5000", "5000 - 7500", "7500 - 10000", "10000 - 12500", "12500 - 15000",
-                  "15000 - 17500", "17500 - 20000"],
-        "vals": [0] * 8
+        "langs": ["1000 - 5000", "5000 - 10000", "10000 - 15000", "15000 - 20000"],
+        "vals": [0] * 4
     },
 }
 
@@ -52,22 +51,14 @@ def get_monthly_index_to_inc(monthly_income):
     """
     Get index for a monthly income
     """
-    if 1000 <= monthly_income < 2500:
-        return 0
-    if 2500 <= monthly_income < 5000:
+    if 1000 <= monthly_income < 5000:
         return 1
-    elif 5000 <= monthly_income < 7500:
+    elif 5000 <= monthly_income < 10000:
         return 2
-    elif 7500 <= monthly_income < 10000:
+    elif 10000 <= monthly_income < 15000:
         return 3
-    elif 10000 <= monthly_income < 12500:
-        return 4
-    elif 12500 <= monthly_income < 15000:
-        return 5
-    elif 15000 <= monthly_income < 17500:
-        return 6
     else:
-        return 7
+        return 4
 
 
 def get_hourly_rate_index_to_inc(hourly_rate):
@@ -147,7 +138,7 @@ def visualize_classifier(model, directory):
             if "MonthlyIncome" in model.COLS_INDEXES:
                 monthly_income_index = model.COLS_INDEXES["MonthlyIncome"]
                 monthly_income = x[monthly_income_index]
-                monthly_index_to_inc = get_monthly_index_to_inc(monthly_income)
+                monthly_index_to_inc = get_monthly_index_to_inc(monthly_income) - 1
                 cols_for_plotting["MonthlyIncome"]["vals"][monthly_index_to_inc] += 1
 
             if "HourlyRate" in model.COLS_INDEXES:
@@ -247,6 +238,17 @@ def open_gui():
         input_index[label] = i
 
     layout += [[sg.Column(layout1, scrollable=True, key="Column", size=(width * 0.9, height * 0.7))]]
+    layout += [[sg.Text("If you entered values for 'JobSatisfaction' and 'MonthlyIncome' above, please provide "
+                        "the 2 values below:",
+                        font=('Helvetica', 18))]]
+    layout += [[sg.Text("How much your is your MonthlyIncomeImportance (1 - 5)?", font=('Helvetica', 12))],
+               [sg.Input()]]
+    layout += [[sg.Text("How much your is your JobSatisfactionImportance (1 - 5)?", font=('Helvetica', 12))],
+               [sg.Input()]]
+    monthly_income_importance_key = 32
+    job_sat_importance_key = 33
+    checkers.append(MinMaxChecker(min_val=1, max_val=5, col="MonthlyIncomeImportance"))
+    checkers.append(MinMaxChecker(min_val=1, max_val=5, col="JobSatisfactionImportance"))
     layout += [[sg.Button('Submit', font=('Helvetica', 12))]]
 
     # Create the window
@@ -258,11 +260,20 @@ def open_gui():
             # Display and interact with the Window
             event, values = window.read()
 
+            model_with_monthly_income = HREmployeeAttritionModel()
+            vals = {}
+            del model_with_monthly_income.hr_retention_data["EmployeeNumber"]
+            del model_with_monthly_income.hr_retention_data["EmployeeCount"]
+            del model_with_monthly_income.hr_retention_data["Over18"]
+            features = [col for col in model_with_monthly_income.hr_retention_data.columns if col != "Attrition"]
+
             if event == "Exit" or event == sg.WIN_CLOSED:
                 break
 
             # Do something with the information gathered
             if values:
+                monthly_income_entered_val = None
+                job_sat_entered_val = None
                 if not values_are_valid(list(values.values())[1:], checkers):
                     continue
 
@@ -272,6 +283,10 @@ def open_gui():
                     for i, feature in zip(range(len(values)), features):
                         val = values[i + 1]
                         if val:
+                            if feature == "MonthlyIncome":
+                                monthly_income_entered_val = int(val)
+                            if feature == "JobSatisfaction":
+                                job_sat_entered_val = int(val)
                             if is_bool_dict[feature]:
                                 val = bool(val)
                                 if val:
@@ -300,25 +315,41 @@ def open_gui():
                     vals = model_with_monthly_income.fit_data(vals)
                     vals = np.asarray([vals])
                     result = model_with_monthly_income.predict(vals)[0]
+                    sat_msg = "Your overall satisfaction from the current job was not calculated"
+                    if job_sat_entered_val and monthly_income_entered_val:
+                        monthly_income_importance = values[monthly_income_importance_key]
+                        job_sat_importance = values[job_sat_importance_key]
+                        if monthly_income_importance and job_sat_importance:
+                            monthly_income_importance = int(monthly_income_importance)
+                            job_sat_importance = int(job_sat_importance)
+                            monthly_income_entered_val = get_monthly_index_to_inc(monthly_income_entered_val)
+                            your_overall_satisfaction = monthly_income_entered_val * monthly_income_importance + \
+                                                        job_sat_entered_val * job_sat_importance
+                            your_overall_satisfaction = 4 * (your_overall_satisfaction - 2) / 38 + 1
+                            sat_msg = f"Your overall satisfaction from your current job is: {your_overall_satisfaction}"
+
                     if result:
                         import psutil
                         p = psutil.Process(timer_proc.pid)
                         p.terminate()
-                        sg.popup(f"{values[0]} it is best that you quit your job...", title="HR Result")
+                        msg = f"{values[0]} it is best that you quit your job..."
                     else:
                         import psutil
                         p = psutil.Process(timer_proc.pid)
                         p.terminate()
-                        sg.popup(f"{values[0]} you shouldn't quit your job!", title="HR Result")
+                        msg = f"{values[0]} you shouldn't quit your job!"
+                    sg.popup(msg + "\n" + sat_msg, title="HR Result")
                     closed_timer = True
-                    model_with_monthly_income = HREmployeeAttritionModel()
                 finally:
                     if not closed_timer:
                         import psutil
                         p = psutil.Process(timer_proc.pid)
                         p.terminate()
         except Exception as e:
+            import traceback
+            logging.info(traceback.format_exc())
             sg.popup(f"There was a failure: {e}", title="Failure!")
+
 
     # Finish up by removing from the screen
     window.close()
