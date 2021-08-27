@@ -250,7 +250,7 @@ def open_gui():
     checkers.append(MinMaxChecker(min_val=1, max_val=5, col="MonthlyIncomeImportance"))
     checkers.append(MinMaxChecker(min_val=1, max_val=5, col="JobSatisfactionImportance"))
     layout += [[sg.Button('Submit', font=('Helvetica', 12))]]
-
+    layout = [[sg.Column(layout, scrollable=True, key="Column2", size=(width, height * 0.9))]]
     # Create the window
     window = sg.Window("HR App", layout, finalize=True)
     window.Maximize()
